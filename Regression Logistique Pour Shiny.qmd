@@ -1,0 +1,100 @@
+---
+title: "Regression Logistique"
+format: html
+editor: visual
+
+conceptor: JEHDAI 
+---
+
+## Utilisation de notre modèle de regression logistique pour Shiny Experience
+
+```{r}
+data_df <- read.csv("Database/titanic.csv")
+View(data_df)
+
+
+library(caret)
+#Summary rapide sut la base des donnees 
+summary(data_df)
+
+#imputer les valeurs manquantes par les moyennes 
+data_df$Age[is.na(data_df$Age)] <- mean(data_df$Age, na.rm=TRUE)
+
+#observations des types de donnees
+str(data_df)
+
+
+
+
+
+```
+
+```{r}
+data_df$Survived <- as.factor(data_df$Survived)
+data_df$Sex <- as.factor(data_df$Sex)
+data_df$Pclass <- as.factor(data_df$Pclass)
+
+str(data_df)
+```
+
+```{r}
+database <- data_df[, c(2,3,5,6,7,8, 10)] #selection des variables ou colonnes importantes pour nos analyses 
+library(caret)
+
+#crer la partition de la BDD, prendre 70 pourcent des datas sur base de la variable Survived 
+set.seed(123) #Assurer la reproductibility du dataset 
+
+
+index <- createDataPartition(database$Survived, p = 0.7, list = F)
+#Jeter un oeil sur index ()
+index
+
+#creer les deux bases 
+#-base apprentissage 
+
+
+base_train <- database[index, ] #base d'entrainage du model 
+
+
+#base test 
+base_test <- database[-index,] #base de test du model 
+#autre option pour avoir l'index
+#index <-sample(1:nrow(), 0.7 *nrow(data_df))
+names(base_train) #voir les colonnes apres suppression des autres variables inutiles
+names(base_test)
+```
+
+```{r}
+model_logistique <- glm(Survived ~ ., family = binomial, data = base_train)
+
+model_logistique
+
+
+```
+
+```{r}
+#Stocker la regression logistique en tant que objet dans un repertoire
+
+saveRDS(model_logistique, "C:/Users/MERCYCORPS/OneDrive - mercycorps.org/Desktop/R practice/Projet 2 Rconfig/Quarto Practice PART5 Linear Regression/Objets Stockes/model_logistique_final.rds")
+
+#Ainsi le fichier de type RDS est créé et est stocké dans le repertoire indiqué sous le nom indiqué (model_logistique_final.rds)
+#Il peut être utilisé dans d'autres applications ou projets... 
+
+```
+
+Utiliser le modèle conçu.
+
+```{r}
+nouveau_modele <- readRDS("C:/Users/MERCYCORPS/OneDrive - mercycorps.org/Desktop/R practice/Projet 2 Rconfig/Quarto Practice PART5 Linear Regression/Objets Stockes/model_logistique_final.rds")
+summary(nouveau_modele)
+```
+
+```{r}
+install.packages("shiny")
+
+install.packages("shinydashboard")
+
+install.packages("DT")
+
+
+```

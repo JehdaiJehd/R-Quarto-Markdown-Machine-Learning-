@@ -1,0 +1,214 @@
+---
+title: "Prediction Consommation Vehicule"
+author: "Jehdai"
+format: html
+editor: visual
+---
+
+# Prediction de la consommation des véhicules
+
+## Etapes
+
+### 1. Collecte des Données
+
+```{r}
+
+#utilisation  de la base de donnees mtcars proposee par R 
+data("mtcars")
+
+
+
+```
+
+### 2. Analyse des Données
+
+#### {r}
+
+#1. Avoir une Situation Globale de tous les vehicules summary(mtcars)
+
+```{r}
+summary(mtcars)
+```
+
+#### - Distribution de consommation des vehicules
+
+La consommation moyenne des véhicules est de 20. Une petite anomalie d'une consommation de plus de 30 est à signaler mais est toutefois négligeable.
+
+```{r}
+library(ggplot2)
+#mgp est la consommaiton en question
+ggplot(data = mtcars, aes(x = "Consommation des vehicules", y = mpg)) +
+  geom_boxplot(color= "purple", fill = "purple")
+
+
+
+```
+
+#### 3. Choix des Variables Pertinentes
+
+#### A noter qu'avant cette étape, il faut d'abord gérer le cas des valeurs manquantes et puis passer aux choix de variables. (utilisation de )
+
+```{r}
+#Ne pas considerer les variables qualitatives dans la suite des analyses , les changer en factor 
+mtcars$vs <- as.factor(mtcars$vs)
+mtcars$am <- as.factor(mtcars$am)
+#creation du graphique des relations simples 
+library(ggplot2)
+
+plot(mtcars)
+```
+
+Mise en place d'une matrice de correlation entre les variables quantitatives
+
+```{r}
+#suppression des variables qualitatives 
+#copie de la bdd seulement avec les quanti 
+base_quanti <- mtcars[, -which(names(mtcars) %in% c("vs", "am"))]
+base_quanti
+
+#matrice de correlation de toutes les variables restantes (quanti)
+cor(base_quanti)
+
+#utilisation de reshape2 pour avoir une hitmap de correlation 
+# Install and load reshape2 package(doc geeks for ggeks)
+#install.packages("reshape2") #A commenter avant de faire le render (rendu) pour eviter la double compilation 
+library(reshape2)
+ 
+# creating correlation matrix
+# creating correlation matrix
+corr_mat <- round(cor(base_quanti),2)
+ 
+# reduce the size of correlation matrix
+melted_corr_mat <- melt(corr_mat)
+head(melted_corr_mat)
+ 
+# plotting the correlation heatmap
+library(ggplot2)
+ggplot(data = melted_corr_mat, aes(x=Var1, y=Var2, 
+                                   fill=value)) + 
+geom_tile() +
+geom_text(aes(Var2, Var1, label = value), 
+          color = "black", size = 2)
+
+#interpétation
+#souvent mieux d'interpreter les valeurs sup a 0,6 en val absolue
+```
+
+Les variables fortement négativement reliées à la consommation(mpg) sont cyl, disp, hp et carb. Il est donc possible de retrouver une correlation négative forte, c'est aussi une correlation mais négative.
+
+##### Analyse de liaison entre mpg et am (qualitative deux modalités)
+
+Correlation entre les variables qualitatives (vs, am) et mpg.
+
+Il est possible que la consommation (mpg) soit influencée par le am(type transmission, am=0 automatique, am=1 Manuel). La consommation est élévée pour les véhicules à transmission manuelle (1) et moins élévée en transmission automatique (0).
+
+Cette relation possible est à valider et à prouver avec le test Student.
+
+```{r}
+ggplot(data = mtcars, aes(x = am, y = mpg))+
+  geom_boxplot()
+```
+
+a)  Test statistique de Student (Pour une variable qualitative de deux modalités et une variable quantitative)
+
+```{r}
+t.test(mpg ~ am, data = mtcars)
+```
+
+Vérification des hypothèses du test de student
+
+-   Normalité
+
+```{r}
+# utilisation d'un qqplot 
+qqnorm(mtcars$mpg)
+qqline(mtcars$mpg, col= "red") #droite de Henry 
+
+```
+
+```{r}
+#avec le test de shapiro
+
+
+```
+
+La normalité est bien vérifiée car la plus grande partie de points s'alignent sur la droite de Henry
+
+-   Egalité de variance
+
+    ```{r}
+    #installation du package car 
+    #install.packages("car")
+    library(car)
+    leveneTest(mpg ~ am, data= mtcars)
+
+    ```
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+D'autres tests peuvent être appliqués pour vérifier la normalité et l'égalité de variance
+
+```{r}
+#Test de Wesh 
+t.test(mpg ~ am, data = mtcars, var.equal = FALSE)
+#test de Wlcox 
+wilcox.test(mpg ~ am, data = mtcars)
+
+```
+
+Ainsi dit, nous concluons qu'il y a une relation entre toutes les variables évaluées (am, vs, cyl, disp, hp et carb).
+
+#### 4. Mise en place d'un modèle de regression linéaire
+
+sachant que la variable à predire est mpg sur base de toutes les autres variables (explicatives).
+
+```{r}
+model <- lm(mpg ~ ., data = mtcars)
+```
+
+Après avoir obtenu le modèle de regression, allons vérifier les résidus
+
+```{r}
+#summary du model 
+summary(model)
+
+```
+
+```{r}
+#le residus 
+residualPlot(model)
+
+```
+
+Verifier la multicorrelianilité
+
+Elle est visible d'autant plus que plusieurs valeurs sont supérieures à 5 et 10 .
+
+les 3 variables à grandes valeurs sont retirées du modèle car elles sortent du lot. Ainsi nous refaisons notre modèle de regression linéaire sans les 3 variables
+
+```{r}
+vif(model)
+```
+
+```{r}
+#model_bis <- lm(mpg ~ vs am, data = mtcars)
+#les retirer de la bdd puis refaire le modele 
+
+base_t <- mtcars[, -which(names(mtcars) %in% c("cyl", "disp", "hp", "qsec","carb"))]
+model_bis <- lm(mpg ~ ., data = mtcars)
+
+summary(model_bis)
+```
+
+#### 5. Faire la prédiction pour de nouvelles données sur base de notre modèle
+
+Ainsi pour un vehicule avec ces caractéristiques (hp=5, cyl=5, disp=4, drat=3, wt=7, vs = as.factor(1), am = as.factor(0), qsec= 2, gear=2, carb=3)), la valeur du mpg serait 1 -9.28128
+
+```{r}
+vif(model_bis)
+#on complete juste les variables qui ressortent dans notre model apres vif function 
+predict(model_bis, data.frame(hp=5, cyl=5, disp=4, drat=3, wt=7, vs = as.factor(1), am = as.factor(0), qsec= 2, gear=2, carb=3))
+```

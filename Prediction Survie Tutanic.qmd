@@ -1,0 +1,242 @@
+---
+title: "Machine Learning Part 6 Random Forest"
+format: html
+editor: visual
+
+Conceptor: JEHDAI 
+---
+
+## Random Forest (Forêt aléatoire, prédiction par classification)
+
+On choisit des variables sur base desquelles on va constituer nos arbres de décisions(précisiser les n (nombre d'arbres), et puis on établit ces arbres qui classifient nos données en deux ou plusieurs catégories (exemple, hommes ou femmes, survivants ou pas) et puis on fera la moyenne des résultats de tous ces arbres et tirer une conclusion.
+
+Pour cette situation, nous voulons essayer de prédire la survie d'un individu dans le titanic...
+
+## Régression logistique en R
+
+### Chargement de la Base des données
+
+```{r}
+#Importation de la BDD 
+data_df <- read.csv("Database/titanic.csv")
+View(data)
+
+```
+
+### Diviser la base des données en Deux
+
+La base d'apprentissage 70% de la base totale
+
+La base de test est de 30 %
+
+```{r}
+#Utilisation du package caret
+#install.packages("caret")
+#library(caret)
+#Summary rapide sut la base des donnees 
+#summary(data_df)
+
+#imputer les valeurs manquantes par les moyennes 
+#data_df$Age[is.na(data_df$Age)] <- mean(data_df$Age, na.rm=TRUE)
+
+#observations des types de donnees
+#str(data_df)
+
+
+
+
+```
+
+##### Il est Important de noter que pour ce modèle de classification, il faut à tout prix convertir toutes les variables importantes (Survived) en Facteurs (question de catégoriser les éléments), le Sexe...
+
+```{r}
+data_df$Survived <- as.factor(data_df$Survived)
+data_df$Sex <- as.factor(data_df$Sex)
+data_df$Pclass <- as.factor(data_df$Pclass)
+
+str(data_df)
+table(data_df$Survived) #voir juste la proportion 
+table(data_df$Sex)
+
+summary(data_df)
+
+
+```
+
+##### Division de la Base des données en Deux
+
+```{r}
+
+database <- data_df[, c(2,3,5,6,7,8, 10)] #selection des variables ou colonnes importantes pour nos analyses 
+library(caret)
+
+#crer la partition de la BDD, prendre 70 pourcent des datas sur base de la variable Survived 
+set.seed(123) #Assurer la reproductibility du dataset 
+
+
+index <- createDataPartition(database$Survived, p = 0.7, list = F)
+#Jeter un oeil sur index ()
+index
+
+#creer les deux bases 
+#-base apprentissage 
+
+
+base_train <- database[index, ] #base d'entrainage du model 
+
+
+#base test 
+base_test <- database[-index,] #base de test du model 
+#autre option pour avoir l'index
+#index <-sample(1:nrow(), 0.7 *nrow(data_df))
+names(base_train) #voir les colonnes apres suppression des autres variables inutiles
+names(base_test)
+
+
+```
+
+### Régression Logistique
+
+Comme Nous le remarquons avec le resumé de notre modèle de regression logistique, les valeurs négatives dans la colonne Estimate signifient que plus vous êtes identifés dans ces catégories ou ces variables, plus votre chance de Survie est minime. Par exemple, la valeur de Sexmale qui est -2 signifie que plus vous êtes Masculin (homme), moins vous avez une chance de survie, la valeur Pclass3 est aussi de -2, donc plus vous êtes dans la Pclass 3, votre chance de survie est minime. Pour les P-Value, lorsque c'est inférieur ou égale à 0.05, donc la variable exlicative en question explique grandement la variable dépendante.
+
+```{r}
+
+model_logistique <- glm(Survived ~ ., family = binomial, data = base_train)
+
+#Autre maniere 
+model_logistique2 <- glm(Survived ~ Pclass + Sex+Age+ SibSp +Parch+ Fare, family = binomial, data = base_train)
+
+#voir la vision globale du model 
+summary(model_logistique)
+#Avec ce summary, nous remarquons déjà dans la colonne Estimate
+
+```
+
+## Prédiction sur la nouvelle base des données (prédiction probabiliste)
+
+```{r}
+
+prediction <- predict(model_logistique, type = "response") #prediction de probabilité 
+
+prediction
+
+```
+
+#### Prediction de Probabilité sur les données du test (base test)
+
+```{r}
+install.packages("pROC")
+library(pROC)
+
+#prediction sur la base des données de test en Ignorant la Variable dependante car c'est elle qui est à expliquer 
+
+prediction <- predict(model_logistique, newdata = base_test[, -1], type = "response")
+
+prediction 
+```
+
+#### Courbe ROC et AUC
+
+```{r}
+roc_obj <- roc(base_test$Survived, prediction, levels= c("0", "1"))
+print(auc(roc_obj))
+plot(roc_obj, main = "COURBE ROC ")
+```
+
+Détermination de la valeur de l'UAC pour voir le niveau de précision et fiabilité de notre modèle de prédiction... Notons que la valeur de l'acu étant 82 pourcent, cela signifie qu'à 80 pourcent ou bien que 80 pourcent d'individus auront des prédictions proches de la réalité.
+
+```{r}
+roc_resultat <- roc(response = base_test$Survived, predictor = prediction)
+auc_resultat <- auc(roc_resultat)
+auc_resultat
+```
+
+Il est important de déterminer la courbe ROC et la valeur de l'auc pour notre base de données d'apprentissage pour évaluer la différence ou le matching entre les deux.
+
+Après les tests, on se retrouve avec une valeur de 86 pourcent d'auc pour la base de données d'apprentissage. Les deux valeurs étant rapprochées (82 et 86), on remarque que c'est une bonne chose et que notre modèle a bien appris... Tout est parfait.
+
+```{r}
+prediction2 <- predict(model_logistique, newdata = base_train[, -1], type = "response")
+
+prediction2 
+
+roc_obj2 <- roc(base_train$Survived, prediction2, levels= c("0", "1"))
+print(auc(roc_obj2))
+plot(roc_obj2, main = "COURBE ROC BDD Apprentissage")
+
+roc_resultat2 <- roc(response = base_train$Survived, predictor = prediction2)
+auc_resultat2 <- auc(roc_resultat2)
+auc_resultat2
+
+
+```
+
+## Les Forêts Aléatoires (Random Forrest)
+
+Après avoir fait la regression logistique qui est linéaire, palce à un autre modèle de machine learning.
+
+```{r}
+#install.packages("randomForest")
+library(randomForest)
+library(caret)
+
+model_random_forest <- randomForest(Survived ~., data = base_train, importance = TRUE, ntree = 500)
+
+model_random_forest
+
+
+
+
+```
+
+Il est possible d'avoir aussi les variables les plus importantes de notre modèle de machine learning, pour voir les variables qui contribuent ou expliquent le plus notre varaiable dépendante (Survived).
+
+```{r}
+varImp(model_random_forest)
+```
+
+On remarque le Sex est un élément qui influence beaucoup la survie des gens dans notre modèle, puis la PClass... c'est donc beaucoup plus sur l'importance des variables.
+
+Mieux encore, on peut le constater sur un graphique:
+
+```{r}
+varImpPlot(model_random_forest)
+
+```
+
+Faire un plot du modèle
+
+```{r}
+plot(model_random_forest)
+```
+
+### Prédiction sur base du modèle de random Forest
+
+Avec toutes les étapes décrites ci-haut (Courbe ROC, valeur de l'auc)
+
+```{r}
+library(pROC)
+
+prediction_train <- predict(model_random_forest)
+prediction_train
+
+
+
+
+roc_obj3 <- roc(base_train$Survived, prediction_train, levels= c("0", "1"))
+print(auc(roc_obj3))
+plot(roc_obj3, main = "COURBE ROC BDD Train du Random Forest")
+
+roc_resultat3 <- roc(response = base_train$Survived, predictor = prediction_train)
+auc_resultat3 <- auc(roc_resultat3)
+auc_resultat3
+
+#pour la base de donnees test 
+prediction_test <- predict(model_random_forest, newdata = base_test[, -1], type = "response")
+
+
+```
+
+On refait les mêmes étapes que pour le modèle de regression logistique, et on compare les valeurs....
+
+Après calculs, on se rend compte que pour le modèle de machine learning Random Forest est aussi bien et approprié pour notre étude................................
